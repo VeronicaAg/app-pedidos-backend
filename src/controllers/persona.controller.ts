@@ -5,20 +5,22 @@ import {
   Filter,
   FilterExcludingWhere,
   repository,
-  Where,
+  Where
 } from '@loopback/repository';
 import {
   del,
   get,
   getModelSchemaRef,
+  HttpErrors,
   param,
   patch,
   post,
   put,
   requestBody,
-  response,
+  response
 } from '@loopback/rest';
-import {Persona} from '../models';
+import {Llaves} from '../config/llaves';
+import {Credenciales, Persona} from '../models';
 import {PersonaRepository} from '../repositories';
 import {AutenticacionService} from '../services';
 const fetch = require('node-fetch');
@@ -28,8 +30,40 @@ export class PersonaController {
     @repository(PersonaRepository)
     public personaRepository: PersonaRepository,
     @service(AutenticacionService)
-    public servicioAutenticacion: AutenticacionService,
-  ) {}
+    public servicioAutenticacion: AutenticacionService
+  ) { }
+
+
+
+  @post("/identificarPersona", {
+    responses: {
+      '200': {
+        description: "Identificacion de usuarios"
+      }
+    }
+  })
+  async identidicarPersona(
+    @requestBody() credenciales: Credenciales
+  ) {
+    let p = await this.servicioAutenticacion.IdentificarPersona(credenciales.usuario, credenciales.clave);
+    if (p)
+    {
+      let token = this.servicioAutenticacion.GenerarTokenJWT(p);
+      return{
+        datos: {
+          nombre: p.nombres,
+          correo: p.correo,
+          id: p.id
+        },
+        tk: token
+      }
+    } else
+    {
+      throw new HttpErrors[401]("Datos inválidos")
+    }
+  }
+
+
 
   @post('/personas')
   @response(200, {
@@ -58,12 +92,11 @@ export class PersonaController {
     const destino = persona.correo;
     const asunto = 'Registro en la Plataforma';
     const contenido =
-      'Hola ${persona.nombres}, su nombre de usuario es ${persona.correo} y su contraseña es:${clave}';
-    fetch(
-      'http://127.0.0.1:5000/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}',
-    ).then((data: any) => {
-      console.log(data);
-    });
+    `Hola ${persona.nombres}, su nombre de usuario es ${persona.correo} y su contraseña es:${clave}`;
+    fetch(`${Llaves.urlServicioNotificaciones}/envio-correo?correo_destino=${destino}&asunto=${asunto}&contenido=${contenido}`)
+      .then((data: any) => {
+        console.log(data);
+      });
     return p;
   }
 
